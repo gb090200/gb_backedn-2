@@ -1,51 +1,47 @@
-from flask import Flask, request, render_template_string
+from flask import Flask, request, jsonify
 import smtplib
 from email.message import EmailMessage
 import os
 
 app = Flask(__name__)
+
 PDF_PATH = "Power_BI_Course.pdf"
 
-HTML_FORM = """
-<!DOCTYPE html>
-<html>
-<head><title>Free Power BI Course</title></head>
-<body style='font-family: Arial; text-align: center; margin-top: 100px'>
-  <h1>Get the Full Power BI PDF</h1>
-  <form method='POST'>
-    <input type='email' name='email' placeholder='Enter your email' required style='padding: 10px; width: 300px' /><br><br>
-    <input type='submit' value='Get PDF for Free' style='padding: 10px 20px' />
-  </form>
-</body>
-</html>
-"""
+@app.route("/")
+def home():
+    return "GB Academy Flask Backend is Running"
 
-@app.route('/', methods=['GET', 'POST'])
-def index():
-    if request.method == 'POST':
-        email = request.form['email']
-        send_pdf(email)
-        return f"<h2>Thank you! The PDF has been sent to {email}</h2>"
-    return render_template_string(HTML_FORM)
+@app.route("/send-pdf", methods=["POST"])
+def send_pdf():
+    data = request.get_json()
+    email = data.get("email")
+    payment_id = data.get("payment_id")
 
-def send_pdf(recipient_email):
-    EMAIL_ADDRESS = os.environ.get("EMAIL")
-    EMAIL_PASSWORD = os.environ.get("EMAIL_PASS")
+    if not email or not payment_id:
+        return "Missing email or payment ID", 400
 
-    msg = EmailMessage()
-    msg['Subject'] = 'Your Free Power BI Course PDF'
-    msg['From'] = EMAIL_ADDRESS
-    msg['To'] = recipient_email
-    msg.set_content("Thank you for signing up. Find your Power BI course attached.")
+    try:
+        EMAIL_ADDRESS = os.environ.get("EMAIL")
+        EMAIL_PASS = os.environ.get("EMAIL_PASS")
 
-    with open(PDF_PATH, 'rb') as f:
-        msg.add_attachment(f.read(), maintype='application', subtype='pdf', filename='Power_BI_Course.pdf')
+        msg = EmailMessage()
+        msg["Subject"] = "Your Power BI Masterclass PDF - GB Academy"
+        msg["From"] = EMAIL_ADDRESS
+        msg["To"] = email
+        msg.set_content("Thank you for your payment. Your Power BI PDF is attached.")
 
-    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
-        smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        smtp.send_message(msg)
+        with open(PDF_PATH, "rb") as f:
+            msg.add_attachment(f.read(), maintype="application", subtype="pdf", filename="Power_BI_Course.pdf")
 
-if __name__ == '__main__':
-   import os
-port = int(os.environ.get('PORT', 5000))
-app.run(host='0.0.0.0', port=port)
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+            smtp.login(EMAIL_ADDRESS, EMAIL_PASS)
+            smtp.send_message(msg)
+
+        return "PDF sent successfully", 200
+
+    except Exception as e:
+        return f"Failed to send PDF: {str(e)}", 500
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
